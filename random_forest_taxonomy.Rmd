@@ -1,0 +1,1211 @@
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+rm(list = ls())
+```
+
+Import metadata:
+```{r}
+library(stringr)
+
+# metadata <- read.csv('/mnt/synology/GERARD/DATA/METAHIT/DNA/samples_list_metadata_with_dotsinID.tsv', sep = "\t", header = T, row.names = 7) #METAHIT ORIGINALS
+# 
+metadata <- read.csv('/mnt/synology/GERARD/DATA/METAHIT/DNA_JOINED/samples_list_metadata_with_dotsinID.tsv', sep = "\t", header = T, row.names = 7) #METAHIT JOINED
+
+# metadata <- read.csv('E:/JULIOL/DATA/METAHIT/DNA_JOINED/samples_list_metadata_with_dotsinID.tsv', sep = "\t", header = T, row.names = 7) #METAHIT JOINED
+
+patient <- paste(str_split(rownames(metadata), pattern = '[.]', simplify = T)[,2], str_split(rownames(metadata), pattern = '[.]', simplify = T)[,4], sep = "" )
+timep <- str_split(rownames(metadata), pattern = '[.]', simplify = T)[,3]
+patient <- substr(patient, 3, nchar(patient))
+metadata <- cbind(metadata, patient, timep)
+
+rm(patient)
+
+interest_metadata <- data.frame(metadata$cohort_UC, metadata$smoking.habit, metadata$patient, metadata$timep, metadata$C.Reactive.Protein, metadata$number.relapses, metadata$age.debut, metadata$age, metadata$Calprotectin, row.names = rownames(metadata))
+# metadata$remission_vs_recurrence <- as.factor(metadata$remission_vs_recurrence)
+
+```
+
+<!-- Merge the bug_list (Metaphlan output) into 2 data frames. bug_list is a dataframe with just the species detected. additional_species is data frame with the species detected the NCBI ID and the additional species per sample. -->
+<!-- ```{r, include=FALSE} -->
+<!-- library(readr) -->
+
+<!-- # wd <- '/mnt/synology/GERARD/HUMANN3_RUNS/KATHLEEN_SAMPLES/' #workind directory where output folders are -->
+
+<!-- wd <- '/mnt/synology/GERARD/HUMANN3_RUNS/METAHIT_DNA_RERUN/' #METAHIT RERUN -->
+
+<!-- wd <- '/mnt/synology/GERARD/HUMANN3_RUNS/METAHIT_DNA_ORIGINAL/' #METAHIT ORIGINALS -->
+
+<!-- wd <- '/mnt/synology/GERARD/HUMANN3_RUNS/METAHIT_DNA_JOINED/' #METAHIT JOINED -->
+
+<!-- setwd(wd) -->
+
+<!-- counter <- 1 -->
+
+<!-- for( samp in list.files()) { -->
+<!--   filepath <- paste(wd , samp ,'/', samp , '_combined_reads_metaphlan_bugs_list.tsv', sep = '') -->
+<!--   if (samp != 'logs') { -->
+<!--     if (counter == 1) { -->
+<!--     bug_list <- read_delim(file = filepath, "\t",  col_names = FALSE, comment = "#", escape_double = FALSE, trim_ws = TRUE) -->
+<!--     additional_species <- data.frame(bug_list[,1:2], bug_list[,4:4]) -->
+<!--     bug_list <- data.frame(bug_list[,c(1,3)]) -->
+<!--     counter <- counter + 1 -->
+<!--     colnames(additional_species)[counter+1] <- paste('additional_species_',samp,sep='') -->
+<!--     colnames(bug_list)[counter] <- samp -->
+
+<!--     } -->
+<!--     else { -->
+<!--     bug_list_temp <- read_delim(file = filepath, "\t",  col_names = FALSE, comment = "#", escape_double = FALSE, trim_ws = TRUE) -->
+<!--     additional_species_temp <- data.frame(bug_list_temp[,1:2], bug_list_temp[,4:4]) -->
+<!--     bug_list_temp <- data.frame(bug_list_temp[,c(1,3)]) -->
+<!--     bug_list <- merge(bug_list, bug_list_temp, all = TRUE) -->
+<!--     additional_species <- merge(additional_species, additional_species_temp, all = TRUE) -->
+<!--     counter <- counter + 1 -->
+<!--     colnames(bug_list)[counter] <- samp -->
+
+<!--     colnames(additional_species)[counter+1] <- paste('additional_species_',samp,sep='') -->
+<!--     } -->
+<!--   } -->
+<!-- } -->
+<!-- bug_list <- data.frame(bug_list, row.names = 1) -->
+<!-- additional_species <- data.frame(additional_species, row.names = 1) -->
+<!-- colnames(additional_species)[1] <- "NCBI_tax_id" -->
+<!-- rm(bug_list_temp) -->
+<!-- rm(additional_species_temp) -->
+
+<!-- #Convert NA's to 0 (as they are reads and NA means no reads, aka 0): -->
+<!-- #bug_list[is.na(bug_list)] <- 0 -->
+
+<!-- ``` -->
+
+<!-- Merge the additional species per sample in a column (additional_data) and merge it with the bug_list (final_dataframe): -->
+<!-- ```{r} -->
+<!-- cancel=FALSE -->
+<!-- NCBI_tax_id=c() -->
+<!-- row_names=c() -->
+<!-- additional_taxas=c() -->
+<!-- for (i in 1:dim(additional_species)[1]){ -->
+<!--   switcher=FALSE -->
+<!--   taxa=NA -->
+<!--   for (j in 2:dim(additional_species)[2]) { -->
+<!--     if (switcher == TRUE && !is.na(additional_species[i,j])) { -->
+<!--       if (taxa == additional_species[i,j]){ -->
+<!--         #print("they are equal") -->
+<!--       } -->
+<!--       if (taxa != additional_species[i,j]){ -->
+<!--         cancel=TRUE; -->
+<!--       } -->
+<!--     }else if(!is.na(additional_species[i,j])){ -->
+<!--       switcher=TRUE -->
+<!--       taxa=additional_species[i,j] -->
+<!--     } -->
+<!--   } -->
+<!--   if (cancel==FALSE){ -->
+<!--     rownam=row.names(additional_species[i,]) -->
+<!--     row_names=c(row_names, rownam) -->
+
+<!--     taxa_id=additional_species[i,1] -->
+<!--     NCBI_tax_id=c(NCBI_tax_id, taxa_id) -->
+
+<!--     additional_taxas=c(additional_taxas, taxa) -->
+
+<!--   }else{print("additional species are not equal")} -->
+<!-- } -->
+
+<!-- additional_data=data.frame(row_names, NCBI_tax_id, additional_taxas,row.names = 1) -->
+
+<!-- final_dataframe <- cbind(additional_data,bug_list) -->
+
+<!-- ``` -->
+
+```{r}
+bug_list <- read.csv('/mnt/synology/GERARD/DATA/METAHIT/DNA_JOINED/buglist_Methait_DNAjoined.tsv', sep = '\t', row.names = 1 , header = T)
+# bug_list <- read.csv('E:/JULIOL/DATA/METAHIT/DNA_JOINED/buglist_Methait_DNAjoined.tsv', sep = '\t', row.names = 1 , header = T)
+```
+
+Isolate the species from metaphlan output into just_species data frame
+```{r}
+to_look = "s__"
+
+for (i in row.names(bug_list)) {
+  if (grepl(to_look,i)) {
+      if (!exists("just_species")){
+      just_species <- data.frame(bug_list[i,])
+    } 
+    else if (exists("just_species")){
+      just_species <- rbind(just_species, bug_list[i,])
+    }
+  }
+}
+just_species[is.na(just_species)] <- 0
+
+# for (i in 1:dim(just_species)[2]) {
+#   print(sum(just_species[,i]))
+# }
+```
+
+Filter read by abundance and prevalence:
+```{r}
+#Set the prevalence and the abundance to filter
+filter_prevalence_abundance_dataframe <- function(unfilter_dataframe, abundance = 0.001, prevalence = 0.1){
+  rows_to_keep=c()
+  number_of_samples=dim(unfilter_dataframe)[2]
+  colsums_vector = colSums(unfilter_dataframe)
+  for (i in 1:dim(unfilter_dataframe)[1]) {
+    row_vector = unfilter_dataframe[i,]
+    relabun_row_vector = row_vector/colsums_vector
+    num_over_abundance = sum((relabun_row_vector > abundance) == TRUE)
+    if (num_over_abundance/number_of_samples > prevalence) {
+      rows_to_keep = c(rows_to_keep, i)
+    }
+  }
+  filtered_dataframe <- unfilter_dataframe[rows_to_keep,]
+  return(list(filtered_dataframe, rows_to_keep))
+}
+
+filtered <- filter_prevalence_abundance_dataframe(just_species)
+just_species_filtered <- filtered[[1]] #apply to species df
+
+
+rm(filtered)
+```
+
+
+```{r}
+library(stringr)
+library(phyloseq)
+# rm(taxa_table)
+for (i in row.names(just_species_filtered)) {
+  tax_list <- str_split(i,"\\|", simplify = T)
+  kingdom <- str_split(tax_list[1], pattern = "k__", simplify = T)[2]
+  phylum<- str_split(tax_list[2], pattern = "p__", simplify = T)[2]
+  class<- str_split(tax_list[3], pattern = "c__", simplify = T)[2]
+  order<- str_split(tax_list[4], pattern = "o__", simplify = T)[2]
+  family<- str_split(tax_list[5], pattern = "f__", simplify = T)[2]
+  genus <- str_split(tax_list[6], pattern = "g__", simplify = T)[2]
+  specie <- str_split(tax_list[7], pattern = "s__", simplify = T)[2]
+
+  if (!exists("taxa_table")){
+      taxa_table <- data.frame(kingdom, phylum, class, order, family, genus, specie, stringsAsFactors = F)
+    } 
+    else if (exists("taxa_table")){
+      taxa_table <- rbind(taxa_table, c(kingdom, phylum, class, order, family, genus, specie))
+    }
+}
+# just_species<-just_species/100
+otable_species <- otu_table(just_species_filtered, taxa_are_rows = T)
+tax = tax_table(taxa_table)
+colnames(tax) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+taxa_names(tax) <- row.names(just_species_filtered)
+row.names(taxa_table) <- row.names(just_species_filtered)
+sampdata <- sample_data(metadata)
+phy_species <- phyloseq(otable_species, sampdata, tax)
+```
+
+
+<!-- Random forest with caret: -->
+<!-- ```{r} -->
+<!-- library(caret) -->
+<!-- library(randomForest) -->
+<!-- set.seed(2323) #set seed for reproducibility -->
+<!-- inTrain <- createDataPartition(predictors_df$disease, p = 0.666, list = F) -->
+<!-- training <- predictors_df[inTrain,] -->
+<!-- testing <- predictors_df[-inTrain,] -->
+
+<!-- # training <- predictors_df -->
+<!-- # modFit <- train(disease~ ., data = training, method = "rf", importance = T) -->
+
+
+<!-- ctrl <- trainControl(method="cv",  -->
+<!--                      summaryFunction=twoClassSummary,  -->
+<!--                      classProbs=T, -->
+<!--                      savePredictions = T) -->
+<!-- modFit <- train(disease~ ., data = training, method = "rf", importance = T, trControl = ctrl) -->
+
+<!-- modFit -->
+
+<!-- library(MLeval) -->
+<!-- evalm(modFit, gnames = "CD vs non-CD", plots = "r") -->
+
+<!-- varImpPlot(modFit$finalModel) -->
+
+<!-- predict(modFit, testing) -->
+<!-- testing$disease -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+
+<!-- predict(modFit, testing) -->
+<!-- plot.roc(factor(testing$disease, ordered = T), factor(predict(modFit, testing),  -->
+<!--        ordered = TRUE), print.auc = T) -->
+<!-- confusionMatrix(data = predict(modFit, testing), reference = testing$disease, mode = "prec_recall") -->
+<!-- ``` -->
+Load CCFA:
+```{r}
+metadata_CCFA <- read.csv('/mnt/synology/GERARD/DATA/CCFA_project/samples.txt_metadata.tsv', sep = "\t", header = T, row.names = 1) #path to metadata file KATHLEEN
+# metadata_CCFA$MOD = "CD"
+# 
+bug_list_CCFA <- read.csv('/mnt/synology/GERARD/DATA/CCFA_project/buglist_CCFA.tsv', sep = '\t', row.names = 1 , header = T)
+
+# metadata_CCFA <- read.csv('E:/JULIOL/DATA/samples.txt_metadata.tsv', sep = "\t", header = T, row.names = 1) #path to metadata file KATHLEEN
+metadata_CCFA$MOD = "CD"
+
+# bug_list_CCFA <- read.csv('E:/JULIOL/DATA/buglist_CCFA.tsv', sep = '\t', row.names = 1 , header = T)
+```
+
+
+Isolate the species from metaphlan output into just_species data frame
+```{r}
+to_look = "s__"
+
+for (i in row.names(bug_list_CCFA)) {
+  if (grepl(to_look,i)) {
+      if (!exists("just_species_CCFA")){
+      just_species_CCFA <- data.frame(bug_list_CCFA[i,])
+    } 
+    else if (exists("just_species_CCFA")){
+      just_species_CCFA <- rbind(just_species_CCFA, bug_list_CCFA[i,])
+    }
+  }
+}
+just_species_CCFA[is.na(just_species_CCFA)] <- 0
+
+# for (i in 1:dim(just_species_CCFA)[2]) {
+#   print(sum(just_species_CCFA[,i]))
+# }
+```
+
+```{r}
+# rm(taxa_table)
+for (i in row.names(just_species_CCFA)) {
+  tax_list <- str_split(i,"\\|", simplify = T)
+  kingdom <- str_split(tax_list[1], pattern = "k__", simplify = T)[2]
+  phylum<- str_split(tax_list[2], pattern = "p__", simplify = T)[2]
+  class<- str_split(tax_list[3], pattern = "c__", simplify = T)[2]
+  order<- str_split(tax_list[4], pattern = "o__", simplify = T)[2]
+  family<- str_split(tax_list[5], pattern = "f__", simplify = T)[2]
+  genus <- str_split(tax_list[6], pattern = "g__", simplify = T)[2]
+  specie <- str_split(tax_list[7], pattern = "s__", simplify = T)[2]
+
+  if (!exists("taxa_table_CCFA")){
+      taxa_table_CCFA <- data.frame(kingdom, phylum, class, order, family, genus, specie, stringsAsFactors = F)
+    } 
+    else if (exists("taxa_table_CCFA")){
+      taxa_table_CCFA <- rbind(taxa_table_CCFA, c(kingdom, phylum, class, order, family, genus, specie))
+    }
+}
+# just_species<-just_species/100
+for (j in 1:ncol(just_species_CCFA)) {
+  colnames(just_species_CCFA)[j] <- str_split(colnames(just_species_CCFA)[j], "_profile", simplify = T)[1]
+}
+otable_species_CCFA <- otu_table(just_species_CCFA, taxa_are_rows = T)
+tax_CCFA = tax_table(taxa_table_CCFA)
+colnames(tax_CCFA) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+taxa_names(tax_CCFA) <- row.names(just_species_CCFA)
+row.names(taxa_table_CCFA) <- row.names(just_species_CCFA)
+sampdata_CCFA <- paste(sample_data(metadata_CCFA), "_profile")
+phy_species_CCFA <- phyloseq(otable_species_CCFA, sampdata_CCFA, tax_CCFA)
+```
+
+
+Load hmp metadata and functional profiles:
+```{r}
+metadata_usa <- read.csv('/mnt/synology/GERARD/DATA/HUTTENHOWER_LAB/hmp2_metadata.csv', sep = ",", header = T) #METAHIT ORIGINALS
+
+# metadata_usa <- read.csv('E:/JULIOL/DATA/hmp2_metadata.csv', sep = ",", header = T) #METAHIT ORIGINALS
+
+metadata_usa <- metadata_usa[metadata_usa$data_type == 'metagenomics',]
+
+rownames(metadata_usa) <- metadata_usa$External.ID
+metadata_usa$remission_vs_recurrence <- NA
+metadata_usa$remission_vs_recurrence[metadata_usa$hbi >= 4] <- "RELAPSE"
+metadata_usa$remission_vs_recurrence[metadata_usa$hbi < 4] <- "REMISSION"
+metadata_usa$remission_vs_recurrence[metadata_usa$sccai >= 4] <- "RELAPSE"
+metadata_usa$remission_vs_recurrence[metadata_usa$sccai < 4] <- "REMISSION"
+
+
+bug_list_usa <- read.csv('/mnt/synology/GERARD/DATA/HUTTENHOWER_LAB/hmp2_mgx_taxonomy.tsv', sep = '\t', row.names = 1 , header = T)
+
+# bug_list_usa <- read.csv('E:/JULIOL/DATA/hmp2_mgx_taxonomy.tsv', sep = '\t', row.names = 1 , header = T)
+
+```
+
+Isolate the species from metaphlan output into just_species data frame
+```{r}
+to_look = "s__"
+
+for (i in row.names(bug_list_usa)) {
+  if (grepl(to_look,i)) {
+      if (!exists("just_species_usa")){
+      just_species_usa <- data.frame(bug_list_usa[i,])
+    } 
+    else if (exists("just_species_usa")){
+      just_species_usa <- rbind(just_species_usa, bug_list_usa[i,])
+    }
+  }
+}
+just_species_usa[is.na(just_species_usa)] <- 0
+
+# for (i in 1:dim(just_species_usa)[2]) {
+#   print(sum(just_species_usa[,i]))
+# }
+```
+
+```{r}
+# rm(taxa_table)
+for (i in row.names(just_species_usa)) {
+  tax_list <- str_split(i,"\\|", simplify = T)
+  kingdom <- str_split(tax_list[1], pattern = "k__", simplify = T)[2]
+  phylum<- str_split(tax_list[2], pattern = "p__", simplify = T)[2]
+  class<- str_split(tax_list[3], pattern = "c__", simplify = T)[2]
+  order<- str_split(tax_list[4], pattern = "o__", simplify = T)[2]
+  family<- str_split(tax_list[5], pattern = "f__", simplify = T)[2]
+  genus <- str_split(tax_list[6], pattern = "g__", simplify = T)[2]
+  specie <- str_split(tax_list[7], pattern = "s__", simplify = T)[2]
+
+  if (!exists("taxa_table_usa")){
+      taxa_table_usa <- data.frame(kingdom, phylum, class, order, family, genus, specie, stringsAsFactors = F)
+    } 
+    else if (exists("taxa_table_usa")){
+      taxa_table_usa <- rbind(taxa_table_usa, c(kingdom, phylum, class, order, family, genus, specie))
+    }
+}
+# just_species<-just_species/100
+for (j in 1:ncol(just_species_usa)) {
+  colnames(just_species_usa)[j] <- str_split(colnames(just_species_usa)[j], "_profile", simplify = T)[1]
+}
+otable_species_usa <- otu_table(just_species_usa, taxa_are_rows = T)
+tax_usa = tax_table(taxa_table_usa)
+colnames(tax_usa) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species")
+taxa_names(tax_usa) <- row.names(just_species_usa)
+row.names(taxa_table_usa) <- row.names(just_species_usa)
+# sampdata_usa <- paste(sample_data(metadata_usa), "_profile")
+sampdata_usa <- sample_data(metadata_usa)
+phy_species_usa <- phyloseq(otable_species_usa, sampdata_usa, tax_usa)
+```
+Import list of predictor species MetaHit:
+```{r}
+# predictospecies <- c(readLines("/mnt/synology/GERARD/DATA/RANDOM_FOREST/CD_v_NonIBD_predictors.list"))
+# predictospecies <- c(readLines("/mnt/synology/GERARD/DATA/RANDOM_FOREST/UC_v_NonIBD_predictors.list"))
+
+# predictospecies <- c(readLines("E:/JULIOL/DATA/CD_v_NonIBD_predictors_1.list"))
+predictospecies <- c(readLines("/media/gsergom/TOSHIBA/JULIOL/DATA/CD_v_NonIBD_predictors_1.list"))
+
+
+for (i in 1:nrow(just_species_filtered)) {
+  
+  rownames(just_species_filtered)[rownames(just_species_filtered) == rownames(just_species_filtered[i,])] <- taxa_table$specie[rownames(taxa_table) == rownames(just_species_filtered[i,])]
+}
+
+predictors_df <- as.data.frame(t(just_species_filtered[rownames(just_species_filtered) %in% predictospecies,]))
+
+
+metadata <- metadata[order(rownames(metadata)),]
+
+predictors_df$disease <- metadata$cohort_UC
+predictors_df$disease[predictors_df$disease == "UC" | predictors_df$disease == "healthy" | predictors_df$disease == "HR"] <- "Non_CD"
+
+predictors_df$disease <- factor(predictors_df$disease, ordered = T)
+```
+
+Make predictors df for CCFA:
+```{r}
+for (i in 1:nrow(just_species_CCFA)) {
+  
+  rownames(just_species_CCFA)[rownames(just_species_CCFA) == rownames(just_species_CCFA[i,])] <- taxa_table_CCFA$specie[rownames(taxa_table_CCFA) == rownames(just_species_CCFA[i,])]
+}
+
+predictors_CCFA_df <- as.data.frame(t(just_species_CCFA[rownames(just_species_CCFA) %in% predictospecies,]))
+
+
+metadata_CCFA <- metadata_CCFA[order(rownames(metadata_CCFA)),]
+
+predictors_CCFA_df$disease <- metadata_CCFA$MOD
+# predictors_CCFA_df <- predictors_CCFA_df[predictors_CCFA_df$disease != "nonIBD",]
+
+predictors_CCFA_df$disease <- factor(predictors_CCFA_df$disease, ordered = T)
+# predictors_CCFA_df$disease <- factor(predictors_CCFA_df$disease, levels = c("CD", "Non_CD"), ordered = T)
+
+```
+
+<!-- Merge MetaHIT and CCFA: -->
+<!-- ```{r} -->
+<!-- predictors_df <- rbind(predictors_df, predictors_CCFA_df) -->
+<!-- ``` -->
+
+Make predictors_df for HMP:
+```{r}
+for (i in 1:nrow(just_species_usa)) {
+  
+  rownames(just_species_usa)[rownames(just_species_usa) == rownames(just_species_usa[i,])] <- taxa_table_usa$specie[rownames(taxa_table_usa) == rownames(just_species_usa[i,])]
+}
+
+predictors_usa_df <- as.data.frame(t(just_species_usa[rownames(just_species_usa) %in% predictospecies,]))
+
+
+metadata_usa <- metadata_usa[order(rownames(metadata_usa)),]
+
+predictors_usa_df$disease <- metadata_usa$diagnosis
+# predictors_usa_df <- predictors_usa_df[predictors_usa_df$disease != "nonIBD",]
+
+predictors_usa_df$disease[predictors_usa_df$disease == "UC" | predictors_usa_df$disease == "nonIBD"] <- "Non_CD"
+
+predictors_usa_df$disease <- factor(predictors_usa_df$disease, ordered = T)
+# predictors_usa_df$disease <- factor(predictors_usa_df$disease, levels = c("CD", "Non_CD"), ordered = T)
+
+```
+
+<!-- Load FIS17 metadata and functional profiles: -->
+<!-- ```{r} -->
+<!-- metadata_FIS <- read.csv('/mnt/synology/GERARD/DATA/FIS_PI17/FIS_PI17_metadata.tsv', sep = "\t", header = T, row.names = 2)  -->
+
+<!-- bug_list_FIS<- read.csv('/mnt/synology/GERARD/DATA/FIS_PI17/buglist_FIS17.tsv', sep = '\t', row.names = 1 , header = T) -->
+
+<!-- ``` -->
+
+
+<!-- Isolate the species from metaphlan output into just_species data frame -->
+<!-- ```{r} -->
+<!-- to_look = "s__" -->
+
+<!-- for (i in row.names(bug_list_FIS)) { -->
+<!--   if (grepl(to_look,i)) { -->
+<!--       if (!exists("just_species_FIS")){ -->
+<!--       just_species_FIS <- data.frame(bug_list_FIS[i,]) -->
+<!--     }  -->
+<!--     else if (exists("just_species_FIS")){ -->
+<!--       just_species_FIS <- rbind(just_species_FIS, bug_list_FIS[i,]) -->
+<!--     } -->
+<!--   } -->
+<!-- } -->
+<!-- just_species_FIS[is.na(just_species_FIS)] <- 0 -->
+
+<!-- # for (i in 1:dim(just_species_FIS)[2]) { -->
+<!-- #   print(sum(just_species_FIS[,i])) -->
+<!-- # } -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- # rm(taxa_table) -->
+<!-- for (i in row.names(just_species_FIS)) { -->
+<!--   tax_list <- str_split(i,"\\|", simplify = T) -->
+<!--   kingdom <- str_split(tax_list[1], pattern = "k__", simplify = T)[2] -->
+<!--   phylum<- str_split(tax_list[2], pattern = "p__", simplify = T)[2] -->
+<!--   class<- str_split(tax_list[3], pattern = "c__", simplify = T)[2] -->
+<!--   order<- str_split(tax_list[4], pattern = "o__", simplify = T)[2] -->
+<!--   family<- str_split(tax_list[5], pattern = "f__", simplify = T)[2] -->
+<!--   genus <- str_split(tax_list[6], pattern = "g__", simplify = T)[2] -->
+<!--   specie <- str_split(tax_list[7], pattern = "s__", simplify = T)[2] -->
+
+<!--   if (!exists("taxa_table_FIS")){ -->
+<!--       taxa_table_FIS <- data.frame(kingdom, phylum, class, order, family, genus, specie, stringsAsFactors = F) -->
+<!--     }  -->
+<!--     else if (exists("taxa_table_FIS")){ -->
+<!--       taxa_table_FIS <- rbind(taxa_table_FIS, c(kingdom, phylum, class, order, family, genus, specie)) -->
+<!--     } -->
+<!-- } -->
+<!-- # just_species<-just_species/100 -->
+<!-- for (j in 1:ncol(just_species_FIS)) { -->
+<!--   colnames(just_species_FIS)[j] <- str_split(colnames(just_species_FIS)[j], "_profile", simplify = T)[1] -->
+<!-- } -->
+<!-- otable_species_FIS <- otu_table(just_species_FIS, taxa_are_rows = T) -->
+<!-- tax_FIS = tax_table(taxa_table_FIS) -->
+<!-- colnames(tax_FIS) <- c("Kingdom", "Phylum", "Class", "Order", "Family", "Genus", "Species") -->
+<!-- taxa_names(tax_FIS) <- row.names(just_species_FIS) -->
+<!-- row.names(taxa_table_FIS) <- row.names(just_species_FIS) -->
+<!-- sampdata_FIS <- paste(sample_data(metadata_FIS), "_profile") -->
+<!-- phy_species_FIS <- phyloseq(otable_species_FIS, sampdata_FIS, tax_FIS) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- for (i in 1:nrow(just_species_FIS)) { -->
+
+<!--   rownames(just_species_FIS)[rownames(just_species_FIS) == rownames(just_species_FIS[i,])] <- taxa_table_FIS$specie[rownames(taxa_table_FIS) == rownames(just_species_FIS[i,])] -->
+<!-- } -->
+
+<!-- predictors_FIS_df <- as.data.frame(t(just_species_FIS[rownames(just_species_FIS) %in% predictospecies,])) -->
+
+
+<!-- metadata_FIS <- metadata_FIS[order(rownames(metadata_FIS)),] -->
+
+<!-- predictors_FIS_df$disease <- metadata_FIS$Type.of.IBD -->
+<!-- # predictors_FIS_df <- predictors_FIS_df[predictors_FIS_df$disease != "nonIBD",] -->
+
+<!-- predictors_FIS_df$disease[predictors_FIS_df$disease == "Ulcerative colitis"] <- "Non_CD" -->
+<!-- predictors_FIS_df$disease[predictors_FIS_df$disease == "Crohns"] <- "CD" -->
+
+<!-- predictors_FIS_df$disease <- factor(predictors_FIS_df$disease, ordered = T) -->
+<!-- # predictors_FIS_df$disease <- factor(predictors_FIS_df$disease, levels = c("CD", "Non_CD"), ordered = T) -->
+
+<!-- ``` -->
+
+
+<!-- See how the model performs: -->
+<!-- ```{r} -->
+<!-- # predict(modFit, predictors_usa_df) -->
+<!-- plot.roc(factor(predictors_usa_df$disease, ordered = T), factor(predict(modFit, predictors_usa_df),  -->
+<!--        ordered = TRUE), print.auc = T) -->
+<!-- confusionMatrix(data = predict(modFit, predictors_usa_df), reference = predictors_usa_df$disease, mode = "prec_recall") -->
+<!-- ``` -->
+```{r}
+# library(MLeval)
+library(pROC)
+library(caret)
+library(randomForest)
+
+# set.seed(1432) #set seed for reproducibility
+set.seed(4231) #set seed for reproducibility
+
+
+inTrain <- createDataPartition(predictors_usa_df$disease, p = 0.666, list = F)
+training <- predictors_usa_df[inTrain,]
+testing <- predictors_usa_df[-inTrain,]
+
+# training <- predictors_df
+# modFit <- train(disease~ ., data = training, method = "rf", importance = T)
+
+
+ctrl <- trainControl(method="cv", 
+                     summaryFunction=twoClassSummary, 
+                     classProbs=T,
+                     savePredictions = T)
+modFit <- train(disease~ ., data = training, method = "rf", importance = T, trControl = ctrl)
+
+modFit
+
+# evalm(modFit, gnames = "CD vs non-CD", plots = "r")
+
+varImpPlot(modFit$finalModel)
+
+
+# set.seed(1234)
+
+selectedIndices <- modFit$pred$mtry == 2
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$pred[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "CD vs Non CD model")
+plot.roc(testing$disease,
+         predict(modFit, testing),
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_df$disease,
+         predict(modFit, predictors_df),
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+# plot.roc(predictors_FIS_df$disease,
+#          predict(modFit, predictors_FIS_df),
+#          print.auc = T,
+#          add = T,
+#          lty = 4, 
+#          col = "green", 
+#          print.auc.y=0.1)
+legend("bottomright",
+       legend=c("American cohort training", "American cohort testing", "European cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),
+       lwd=2, lty= c(1,2,3), cex =0.8, xpd = TRUE, horiz = F)
+# legend("bottomright",
+#        legend=c("American cohort training", "American cohort testing", "European cohort", "FIS cohort"),
+#        col=c("dodgerblue2", "tomato2", "orange2", "green"),
+#        lwd=2, lty= c(1,2,3,4), cex =0.8, xpd = TRUE, horiz = F)
+
+
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$CD[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "CD vs Non CD model")
+plot.roc(testing$disease,
+         predict(modFit, testing, type = "prob")[,1],
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_df$disease,
+         predict(modFit, predictors_df, type = "prob")[,1],
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+# plot.roc(predictors_FIS_df$disease,
+#          predict(modFit, predictors_FIS_df, type = "prob")[,1],
+#          print.auc = T,
+#          add = T,
+#          lty = 4,
+#          col = "green",
+#          print.auc.y=0.1)
+legend("bottomright",
+       legend=c("American cohort training", "American cohort testing", "European cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),# predictospecies <- c(readLines("E:/JULIOL/DATA/CD_v_NonIBD_predictors_1.list"))
+       lwd=2, lty= c(1,2,3), cex =0.8, xpd = TRUE, horiz = F)
+# legend("bottomright",
+#        legend=c("American cohort training", "American cohort testing", "European cohort", "FIS cohort"),
+#        col=c("dodgerblue2", "tomato2", "orange2", "green"),
+#        lwd=2, lty= c(1,2,3,4), cex =0.8, xpd = TRUE, horiz = F)
+```
+
+Random forest with caret:
+```{r}
+library(caret)
+library(randomForest)
+
+set.seed(2323) #set seed for reproducibility
+
+inTrain <- createDataPartition(predictors_df$disease, p = 0.666, list = F)
+training <- predictors_df[inTrain,]
+testing <- predictors_df[-inTrain,]
+
+# training <- predictors_df
+# modFit <- train(disease~ ., data = training, method = "rf", importance = T)
+
+
+ctrl <- trainControl(method="cv",
+                     summaryFunction=twoClassSummary,
+                     classProbs=T,
+                     savePredictions = T)
+modFit <- train(disease~ ., data = training, method = "rf", importance = T, trControl = ctrl)
+
+modFit
+
+library(MLeval)
+
+varImpPlot(modFit$finalModel)
+
+
+set.seed(1234)
+
+selectedIndices <- modFit$pred$mtry == 2
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$pred[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "CD vs Non CD model")
+plot.roc(testing$disease,
+         predict(modFit, testing),
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_usa_df$disease,
+         predict(modFit, predictors_usa_df),
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+# plot.roc(predictors_FIS_df$disease,
+#          predict(modFit, predictors_FIS_df),
+#          print.auc = T,
+#          add = T,
+#          lty = 4, 
+#          col = "green", 
+#          print.auc.y=0.1)
+legend("bottomright",
+       legend=c("European cohort training", "European cohort testing", "American cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),
+       lwd=2, lty= c(1,2), cex =0.8, xpd = TRUE, horiz = F)
+
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$CD[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "CD vs Non CD model")
+plot.roc(testing$disease,
+         predict(modFit, testing, type = "prob")[,1],
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_usa_df$disease,
+         predict(modFit, predictors_usa_df, type = "prob")[,1],
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+# plot.roc(predictors_FIS_df$disease,
+#          predict(modFit, predictors_FIS_df, type = "prob")[,1],
+#          print.auc = T,
+#          add = T,
+#          lty = 4,
+#          col = "green",
+#          print.auc.y=0.1)
+legend("bottomright",
+       legend=c("European cohort training", "European cohort testing", "American cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),
+       lwd=2, lty= c(1,2), cex =0.8, xpd = TRUE, horiz = F)
+```
+Do Random Forest to distinguish UC and Healthy:
+```{r}
+# predictospecies <- c(readLines("/mnt/synology/GERARD/DATA/RANDOM_FOREST/UC_v_NonIBD_predictors.list"))
+
+# predictospecies <- c(readLines("E:/JULIOL/DATA/UC_v_NonIBD_predictors_1.list"))
+predictospecies <- c(readLines("/media/gsergom/TOSHIBA/JULIOL/DATA/UC_v_NonIBD_predictors_1.list"))
+
+
+
+
+predictors_usa_df <- as.data.frame(t(just_species_usa[rownames(just_species_usa) %in% predictospecies,]))
+
+
+metadata_usa <- metadata_usa[order(rownames(metadata_usa)),]
+
+predictors_usa_df$disease <- metadata_usa$diagnosis
+predictors_usa_df <- predictors_usa_df[predictors_usa_df$disease != "CD",]
+
+# predictors_usa_df$disease[predictors_usa_df$disease == "UC" | predictors_usa_df$disease == "nonIBD"] <- "Non_CD"
+
+predictors_usa_df$disease <- factor(predictors_usa_df$disease, ordered = T)
+
+
+predictors_df <- as.data.frame(t(just_species_filtered[rownames(just_species_filtered) %in% predictospecies,]))
+
+
+metadata <- metadata[order(rownames(metadata)),]
+
+predictors_df$disease <- metadata$cohort_UC
+predictors_df <- predictors_df[predictors_df$disease != "CD",]
+predictors_df$disease[predictors_df$disease == "healthy" | predictors_df$disease == "HR"] <- "nonIBD"
+
+predictors_df$disease <- factor(predictors_df$disease, ordered = T)
+```
+
+```{r}
+# library(MLeval)
+library(pROC)
+library(caret)
+library(randomForest)
+
+# set.seed(2323) #set seed for reproducibility
+set.seed(4231) #set seed for reproducibility
+
+inTrain <- createDataPartition(predictors_usa_df$disease, p = 0.666, list = F)
+training <- predictors_usa_df[inTrain,]
+testing <- predictors_usa_df[-inTrain,]
+
+# training <- predictors_df
+# modFit <- train(disease~ ., data = training, method = "rf", importance = T)
+
+
+ctrl <- trainControl(method="cv", 
+                     summaryFunction=twoClassSummary, 
+                     classProbs=T,
+                     savePredictions = T)
+modFit <- train(disease~ ., data = training, method = "rf", importance = T, trControl = ctrl)
+
+modFit
+
+# evalm(modFit, gnames = "CD vs non-CD", plots = "r")
+
+varImpPlot(modFit$finalModel)
+
+
+# set.seed(1234)
+
+selectedIndices <- modFit$pred$mtry == 2
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$pred[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "UC vs Non IBD model")
+plot.roc(testing$disease,
+         predict(modFit, testing),
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_df$disease,
+         predict(modFit, predictors_df),
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+legend("bottomright",
+       legend=c("American cohort training", "American cohort testing", "European cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),
+       lwd=2, lty= c(1,2), cex =0.8, xpd = TRUE, horiz = F)
+
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$UC[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "UC vs Non IBD model")
+plot.roc(testing$disease,
+         predict(modFit, testing, type = "prob")[,1],
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_df$disease,
+         predict(modFit, predictors_df, type = "prob")[,1],
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+legend("bottomright",
+       legend=c("American cohort training", "American cohort testing", "European cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),
+       lwd=2, lty= c(1,2), cex =0.8, xpd = TRUE, horiz = F)
+```
+```{r}
+library(caret)
+library(randomForest)
+set.seed(2323) #set seed for reproducibility
+inTrain <- createDataPartition(predictors_df$disease, p = 0.666, list = F)
+training <- predictors_df[inTrain,]
+testing <- predictors_df[-inTrain,]
+
+# training <- predictors_df
+# modFit <- train(disease~ ., data = training, method = "rf", importance = T)
+
+
+ctrl <- trainControl(method="cv",
+                     summaryFunction=twoClassSummary,
+                     classProbs=T,
+                     savePredictions = T)
+modFit <- train(disease~ ., data = training, method = "rf", importance = T, trControl = ctrl)
+
+modFit
+
+library(MLeval)
+
+varImpPlot(modFit$finalModel)
+
+
+set.seed(1234)
+
+selectedIndices <- modFit$pred$mtry == 2
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$pred[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "UC vs Non IBD model")
+plot.roc(testing$disease,
+         predict(modFit, testing),
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_usa_df$disease,
+         predict(modFit, predictors_usa_df),
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+legend("bottomright",
+       legend=c("European cohort training", "European cohort testing", "American cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),
+       lwd=2, lty= c(1,2), cex =0.8, xpd = TRUE, horiz = F)
+
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$UC[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "UC vs Non IBD model")
+plot.roc(testing$disease,
+         predict(modFit, testing, type = "prob")[,1],
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_usa_df$disease,
+         predict(modFit, predictors_usa_df, type = "prob")[,1],
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+legend("bottomright",
+       legend=c("European cohort training", "European cohort testing", "American cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),
+       lwd=2, lty= c(1,2), cex =0.8, xpd = TRUE, horiz = F)
+```
+
+#################################
+####### RELAPSE-REMISSION #######
+#################################
+
+Import list of predictor species:
+```{r}
+# predictospecies <- c(readLines("/mnt/synology/GERARD/DATA/RANDOM_FOREST/CD_REL_REM_predictors.list"))
+
+predictospecies <- c(readLines("E:/JULIOL/DATA/CD_REL_REM_predictors.list"))
+
+# predictospecies <- c(readLines("/mnt/synology/GERARD/DATA/RANDOM_FOREST/UC_v_NonIBD_predictors.list"))
+
+predictors_df <- as.data.frame(t(just_species_filtered[rownames(just_species_filtered) %in% predictospecies, metadata$cohort_UC == "CD"]))
+
+
+metadata <- metadata[order(rownames(metadata)),]
+
+predictors_df$disease <- metadata$remission_vs_recurrence[metadata$cohort_UC == "CD"]
+
+predictors_df$disease <- factor(predictors_df$disease, ordered = T)
+
+
+
+
+predictors_usa_df <- as.data.frame(t(just_species_usa[rownames(just_species_usa) %in% predictospecies, metadata_usa$diagnosis == "CD" & ! is.na(metadata_usa$remission_vs_recurrence)]))
+
+metadata_usa <- metadata_usa[order(rownames(metadata_usa)),]
+
+predictors_usa_df$disease <- metadata_usa$remission_vs_recurrence[metadata_usa$diagnosis == "CD" & ! is.na(metadata_usa$remission_vs_recurrence)]
+# predictors_usa_df <- predictors_usa_df[predictors_usa_df$disease != "nonIBD",]
+
+predictors_usa_df$disease <- factor(predictors_usa_df$disease, ordered = T)
+# predictors_usa_df$disease <- factor(predictors_usa_df$disease, level
+```
+
+
+Build and test model:
+```{r}
+
+# set.seed(2323) #set seed for reproducibility
+set.seed(1432) #set seed for reproducibility
+
+inTrain <- createDataPartition(predictors_usa_df$disease, p = 0.666, list = F)
+training <- predictors_usa_df[inTrain,]
+testing <- predictors_usa_df[-inTrain,]
+
+# training <- predictors_df
+# modFit <- train(disease~ ., data = training, method = "rf", importance = T)
+
+
+ctrl <- trainControl(method="cv", 
+                     summaryFunction=twoClassSummary, 
+                     classProbs=T,
+                     savePredictions = T)
+modFit <- train(disease~ ., data = training, method = "rf", importance = T, trControl = ctrl)
+
+modFit
+
+# evalm(modFit, gnames = "CD vs non-CD", plots = "r")
+
+varImpPlot(modFit$finalModel)
+
+
+# set.seed(1234)
+
+selectedIndices <- modFit$pred$mtry == 2
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$pred[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "CD Relapse-Remission model")
+plot.roc(testing$disease,
+         predict(modFit, testing),
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_df$disease,
+         predict(modFit, predictors_df),
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+legend("bottomright",
+       legend=c("American cohort training", "American cohort testing", "European cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),
+       lwd=2, lty= c(1,2), cex =0.8, xpd = TRUE, horiz = F)
+
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$RELAPSE[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "CD Relapse-Remission model")
+plot.roc(testing$disease,
+         predict(modFit, testing, type = "prob")[,1],
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_df$disease,
+         predict(modFit, predictors_df, type = "prob")[,1],
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+legend("bottomright",
+       legend=c("American cohort training", "American cohort testing", "European cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),
+       lwd=2, lty= c(1,2), cex =0.8, xpd = TRUE, horiz = F)
+```
+
+##########################################
+####### BASELINE RELAPSE-REMISSION #######
+##########################################
+
+Import list of predictor species:
+```{r}
+# predictospecies <- c(readLines("E:/JULIOL/DATA/base_REMandREL_predictors_1.list"))
+predictospecies <- c(readLines("/media/gsergom/TOSHIBA/JULIOL/DATA/base_REMandREL_predictors_1.list"))
+
+
+predictors_df <- as.data.frame(t(just_species_filtered[rownames(just_species_filtered) %in% predictospecies, metadata$cohort_UC == "CD" & metadata$timep == "0"]))
+
+
+metadata <- metadata[order(rownames(metadata)),]
+
+predictors_df$disease <- as.character(metadata$remission_vs_recurrence[metadata$cohort_UC == "CD" & metadata$timep == "0"])
+predictors_df$ID <- metadata$patient[metadata$cohort_UC == "CD" & metadata$timep == "0"]
+
+#get the relapse patients ID
+a <- metadata[metadata$remission_vs_recurrence == "RELAPSE" & metadata$cohort_UC== "CD",]
+relapseIDs <- a$patient
+rm(a)
+relapseIDs <- levels(as.factor(relapseIDs))
+
+predictors_df <- predictors_df[! is.na(predictors_df$disease),]
+predictors_df$disease[predictors_df$ID %in% relapseIDs] <- "BASE_RELAPSE"
+predictors_df <- predictors_df[,1:12]
+rm(relapseIDs)
+
+predictors_df$disease <- factor(predictors_df$disease, ordered = T)
+
+
+
+
+metadata_usa <- metadata_usa[order(rownames(metadata_usa)),]
+
+base_rem_usa <- metadata_usa[metadata_usa$diagnosis == "CD" & metadata_usa$week_num == "0" & metadata_usa$remission_vs_recurrence == "REMISSION",]
+
+base_rem_usa <- base_rem_usa[! is.na(base_rem_usa$remission_vs_recurrence),]
+base_rem_usa$Participant.ID
+
+base_rel_usa <- metadata_usa[metadata_usa$remission_vs_recurrence == "RELAPSE" & metadata_usa$diagnosis == "CD" & metadata_usa$Participant.ID %in% base_rem_usa$Participant.ID,]
+
+base_rem_usa$remission_vs_recurrence[base_rem_usa$Participant.ID %in% base_rel_usa$Participant.ID] <- "BASE_RELAPSE"
+
+rm(base_rel_usa)
+
+predictors_usa_df <- as.data.frame(t(just_species_usa[rownames(just_species_usa) %in% predictospecies,]))
+predictors_usa_df <- predictors_usa_df[rownames(predictors_usa_df) %in% rownames(base_rem_usa),]
+predictors_usa_df <- predictors_usa_df[order(rownames(predictors_usa_df)),]
+
+predictors_usa_df$disease <- base_rem_usa$remission_vs_recurrence
+
+
+
+# predictors_usa_df <- predictors_usa_df[predictors_usa_df$disease != "nonIBD",]
+
+predictors_usa_df$disease <- factor(predictors_usa_df$disease, ordered = T)
+# predictors_usa_df$disease <- factor(predictors_usa_df$disease, level
+```
+
+Random Forest:
+```{r}
+
+set.seed(4231) #set seed for reproducibility
+
+inTrain <- createDataPartition(predictors_usa_df$disease, p = 0.666, list = F)
+training <- predictors_usa_df[inTrain,]
+testing <- predictors_usa_df[-inTrain,]
+
+# training <- predictors_df
+# modFit <- train(disease~ ., data = training, method = "rf", importance = T)
+
+
+ctrl <- trainControl(method="cv", 
+                     summaryFunction=twoClassSummary, 
+                     classProbs=T,
+                     savePredictions = T)
+modFit <- train(disease~ ., data = training, method = "rf", importance = T, trControl = ctrl)
+
+modFit
+
+# evalm(modFit, gnames = "CD vs non-CD", plots = "r")
+
+varImpPlot(modFit$finalModel)
+
+
+# set.seed(1234)
+# set.seed(2323)
+
+selectedIndices <- modFit$pred$mtry == 6
+
+plot.roc(modFit$pred$obs[selectedIndices],
+         modFit$pred$BASE_RELAPSE[selectedIndices],
+         print.auc = T,
+         add = F,
+         col = "dodgerblue2",
+         print.auc.y=0.4)
+title(main = "CD Baseline Relapse-Remission model")
+plot.roc(testing$disease,
+         predict(modFit, testing, type = "prob")[,1],
+         print.auc = T,
+         add = T, 
+         lty = 2, 
+         col = "tomato2", 
+         print.auc.y=0.3)
+plot.roc(predictors_df$disease,
+         predict(modFit, predictors_df, type = "prob")[,1],
+         print.auc = T,
+         add = T,
+         lty = 3, 
+         col = "orange2", 
+         print.auc.y=0.2)
+legend("bottomright",
+       legend=c("American cohort training", "American cohort testing", "European cohort"),
+       col=c("dodgerblue2", "tomato2", "orange2"),
+       lwd=2, lty= c(1,2), cex =0.8, xpd = TRUE, horiz = F)
+```
+
+
+
+
