@@ -1,0 +1,22 @@
+
+
+# Load libraries:
+```{r}
+library(phyloseq)
+library(Biostrings)
+library(RDPutils)
+```
+
+
+```{r}
+otu <- read.table("./data/processed/otu_table.tsv", row.names = 1, header = TRUE, sep = "\t")
+otu.table <- phyloseq::otu_table(otu, taxa_are_rows = TRUE)
+rep.seqs <- Biostrings::readDNAStringSet("dna-sequences.fasta", format = "fasta")
+expt <- phyloseq::phyloseq(otu.table, rep.seqs)
+expt 
+```
+
+```{r}
+
+```
+
